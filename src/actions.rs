@@ -55,15 +55,38 @@ pub fn run_file() {
 }
 
 fn action_new_file() {
-    todo!()
+    let name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("New file name")
+        .interact_text()?;
+
+    let path = PathBuf::from(&name);
+    if path.exists() {
+        eprintln!("'{}' already exists.", name);
+        return Ok(());
+    }
+
+    std::fs::File::create(&path)?;
+    println!("Created '{}'", name);
+    Ok(())
 }
 
 fn action_new_dir() {
-    todo!()
+    let name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("New folder name")
+        .interact_text()?;
+
+    std::fs::create_dir_all(&name)?;
+    println!("Created directory '{}'", name);
+    Ok(())
 }
 
 fn action_open_picker() {
-    todo!()
+    let name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Path to open")
+        .interact_text()?;
+
+    let path = PathBuf::from(&name);
+    action_open(&path)
 }
 
 fn action_search() {
