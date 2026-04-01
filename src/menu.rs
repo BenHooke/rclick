@@ -43,7 +43,7 @@ pub fn run_file_menu(path: &PathBuf) -> anyhow::Result<()> {
     let is_dir = path.is_dir();
 
     let mut items: Vec<(&str, FileAction)> = vec![
-        ("  Rename", FileAction::Renam),
+        ("  Rename", FileAction::Rename),
         ("  Copy", FileAction::Copy),
         ("  Move", FileAction::Move),
         ("  View", FileAction::View),
@@ -74,7 +74,117 @@ pub fn run_file_menu(path: &PathBuf) -> anyhow::Result<()> {
     }
 }
 
-fn pick_item() {
-    todo!()
+fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Option<usize>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut state = ListState::default();
+    state.select(Some(0));
+
+    let result = loop {
+        terminal.draw(|frame| {
+            let area = frame.area();
+
+            // Display a pop-up in the center of terminal
+            let popup_width = 40u16.min(area.width.saturating_sub(4));
+            let popup_height = (items.len() as u16 + 6).min(area.height.saturating_sub(4));
+            let x = (area.width.saturating_sub(popup_width)) / 2;
+            let y = (area.height.saturating_sub(popup_height)) / 2;
+
+            let popup_area = ratatui::layout::Rect::new(x,y, popup_width, popup_height);
+
+            // Outer block
+            let block = Block::default()
+                .title(Line::from(vec![
+                        Span::styled(title, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                ]))
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray));
+
+            let inner = block.inner(popup_area);
+            frame.render_widget(block, popup_area);
+
+            // Layout - subtitle + list + hint
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(2),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+
+            // Subtitle / context line
+            let sub = Paragraph::new(Line::from(vec![Span::styled(
+                    subtitle,
+                    Style::default().fg(Color::Yellow),
+                )]))
+                .alignment(Alignment::Center);
+            frame.render_widget(sub, chunks[0]);
+
+            // Menu list
+            let list_items: Vec<ListItem> = items
+                .iter()
+                .map(|label| {
+                    ListItem::new(Line::from(vec![Span::raw(*label)]))
+                        .style(Style::default().fg(Color::White))
+                })
+                .collect();
+
+            let list = List::new(list_items)
+                .highlight_style(
+                    Style::default()
+                        .bg(Color::Cyan)
+                        .fg(Color::Black)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol("▶ ");
+
+            frame.render_stateful_widget(list, chunks[1], &mut state);
+
+            // Hint line
+            let hint = Paragraph::new(Line::from(vec![Span::styled(
+                    " ↑↓ navigate   enter select   esc cancel ",
+                    Style::default().fg(Color::DarkGray),
+                )]))
+                .alignment(Alignment::Center);
+            frame.render_widget(hint, chunks[2]);
+        })?;
+
+        if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') => break Ok(None),
+                KeyCode::Enter => {
+                    break Ok(state.selected());
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    let i = state.selected().unwrap_or(0);
+                    state.select(Some((i + 1).min(items.len() - 1)));
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    let i = state.selected().unwrap_or(0);
+                    state.select(Some(i.saturating_sub(1)));
+                }
+                _ => {}
+            }
+        }
+    };
+
+    // Always restore terminal
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    terminal.show_cursor()?;
+
+    result
 }
 
