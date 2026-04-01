@@ -26,12 +26,32 @@ pub enum FileAction {
     Delete,
 }
 
+// Menu when ran with no args
 pub fn run_general() {
-    todo!()
+    println!();
+    match action {
+        GeneralAction::NewFile => action_new_file(),
+        GeneralAction::NewDir => action_new_dir(),
+        GeneralAction::Open => action_open_picker(),
+        GeneralAction::Search => action_search(),
+        GeneralAction::CopyPath => action_copy_path(),
+        GeneralAction::History => action_history(),
+    }
 }
 
+// Menu when user specifies a file
 pub fn run_file() {
-    todo!()
+    println!();
+    match action {
+        FileAction::Rename => action_rename(path),
+        FileAction::Copy => action_copy(path),
+        FileAction::Move => action_move(path),
+        FileAction::Open => action_open(path),
+        FileAction::View => action_view(path),
+        FileAction::Permissions => action_permissions(path),
+        FileAction::Compress => action_compress(path),
+        FileAction::Delete => action_delete(path),
+    }
 }
 
 fn action_new_file() {
