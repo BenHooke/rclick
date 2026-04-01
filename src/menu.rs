@@ -39,8 +39,39 @@ pub fn run_general_menu() -> anyhow::Result<()> {
     }
 }
 
-pub fn run_file_menu() {
-    todo!()
+pub fn run_file_menu(path: &PathBuf) -> anyhow::Result<()> {
+    let is_dir = path.is_dir();
+
+    let mut items: Vec<(&str, FileAction)> = vec![
+        ("  Rename", FileAction::Renam),
+        ("  Copy", FileAction::Copy),
+        ("  Move", FileAction::Move),
+        ("  View", FileAction::View),
+    ];
+
+    if is_dir {
+        items.insert(0, ("  Open", FileAction::Open));
+    }
+
+    items.push(("  Permissions", FileAction::Permissions));
+    items.push(("  Compress", FileAction::Compress));
+    items.push(("  Delete", FileAction::Delete));
+
+    let labels: Vec<&str> = items.iter().map(|(L, _)| *L).collect();
+
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string_lossy().into_owned());
+
+    let title = " rcick ";
+    let subtitle_text = format!(" {} ", name);
+    let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
+
+    match pick_item(&labels, title, subtitle)? {
+        Some(idx) => actions::run_file(&items[idx].1, path),
+        None => Ok(()),
+    }
 }
 
 fn pick_item() {
