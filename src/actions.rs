@@ -2,16 +2,16 @@ use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
-use dualoguer::{Confirm, Input, Select, theme::ColorfulTheme};
+use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 
 #[derive(Debug)]
 pub enum GeneralAction {
     NewFile,
-    NewFolder,
+    NewDir,
     Open,
     Search,
     CopyPath,
-    Histroty,
+    History,
 }
 
 #[derive(Debug)]

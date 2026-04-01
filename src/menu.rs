@@ -18,8 +18,25 @@ use ratatui::{
 
 use crate::actions::{self, FileAction, GeneralAction};
 
-pub fn run_general_menu() {
-    todo!()
+// General right click
+pub fn run_general_menu() -> anyhow::Result<()> {
+    let items = vec![
+        ("  New file", GeneralAction::NewFile),
+        ("  New directory", GeneralAction::NewDir),
+        ("  Open...", GeneralAction::Open),
+        ("  Search...", GeneralAction::Search),
+        ("  Copy path", GeneralAction::CopyPath),
+        ("  History", GeneralAction::History),
+    ];
+
+    let labels: Vec<&str> = items.iter().map(|(L, _)| *L).collect();
+    let title = " rclick ";
+    let subtitle = " Current directory ";
+
+    match pick_item(&labels, title, subtitle)? {
+        Some(idx) => actions::run_general(&items[idx].1),
+        None => Ok(()),  // User pressed Esc or 'q'
+    }
 }
 
 pub fn run_file_menu() {
