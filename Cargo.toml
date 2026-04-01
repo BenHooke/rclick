@@ -1,0 +1,15 @@
+[package]
+name = "rclick"
+version = "0.1.0"
+edition = "2024"
+description = "A user friendly TUI right-click menu for the terminal"
+
+[[bin]]
+name = "rclick"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.27"
+crossterm = "0.27"
+dialoguer = "0.11"
+console = "0.15"
