@@ -8,8 +8,8 @@ A friendly TUI right-click menu for the terminal. Designed for people who are ne
 
 ```sh
 shcurl -fsSL https://raw.githubusercontent.com/BenHooke/rclick/main/install.sh | sh
-The installer detects your OS and architecture, downloads the right binary, and places it in /usr/local/bin. It will also print the optional shell function for cd support.
 ```
+The installer detects your OS and architecture, downloads the right binary, and places it in /usr/local/bin. It will also print the optional shell function for cd support.
 
 ### Build from source (requires Rust)
 
