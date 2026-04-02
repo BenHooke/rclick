@@ -90,19 +90,93 @@ fn action_open_picker() {
 }
 
 fn action_search() {
-    todo!()
+    let options = vec!["Search for a file (by name)", "Search for text (inside files)"];
+    let choice = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("What are you looking for?")
+        .items(&options)
+        .default(0)
+        .interact()?;
+
+    match choice {
+        0 => {
+            // find
+            let query: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("File name to search for (supports wildcards, e.g. *.txt)")
+                .interact_text()?;
+            println!("\nSearching from current directory...\n");
+            Command::new("fing")
+                .args([".", "-name", &query])
+                .status()?;
+        }
+        1 => {
+            // grep
+            let query: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Text to search for")
+                .interact_text()?;
+            let dir: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Search in (directory -default is current dir-)")
+                .default("."into())
+                .interact_text()?;
+            Command::new("grep")
+                .args(["-r", "--color=auto", &query, &dir])
+                .status()?;
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn action_copy_path() {
-    todo!()
+    let cwd = env::current_dir()?;
+    let path_str = cwd.to_string_lossy().into_owned();
+
+    // Try pbcopy (macOS), then xclip, then xsel, then just print
+    let copied =try_copy_to_clipboard(&path_str);
+    if copied {
+        println!("Copied to clipboard:\n  {}", path_str);
+    } else {
+        println!("Error: failed to copy, copy manually:\n  {}", path_str);
+    }
+    Ok(())
 }
 
 fn action_history() {
-    todo!()
+    println!("Shell history is managed by your shell (bash/zsh/fish).");
+    println!("To jump to a recent directory, try:");
+    println!("  cd -          (go back one directory)");
+    println!("  pushd / popd  (directory stack)");
+    println!("  history | grep cd   (search your history)");
+    Ok(())
 }
 
 fn action_rename() {
-    todo!()
+    let old_name = path.file_name().unwrap_or_default().to_string_lossy();
+
+    let new_name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("New name")
+        .with_initial_text(old_name.as_ref())
+        .interact_text()?;
+
+    if new_name == old_name.as_ref() {
+        println!("Name unchanged.");
+        return Ok(());
+    }
+
+    let new_path = path.with_file_name(&new_name);
+    if new_path.exists() {
+        let overwrite = Confirm::with_theme(&ColorfulTheme::default())
+            .with_prompt(format!("'{}' already exists. Overwrite?", new_name))
+            .default(false)
+            .interact()?;
+        if !overwrite {
+            println!("Cancelled");
+            return Ok(());
+        }
+    }
+
+    std::fs::rename(path, &new_path)?;
+    println!("Renamed '{}' to '{}'.", old_name, new_name);
+    Ok(())
 }
 
 fn action_copy() {
