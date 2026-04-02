@@ -27,7 +27,7 @@ pub enum FileAction {
 }
 
 // Menu when ran with no args
-pub fn run_general() {
+pub fn run_general(action: &GeneralAction) -> anyhow:Result<()> {
     println!();
     match action {
         GeneralAction::NewFile => action_new_file(),
@@ -40,7 +40,7 @@ pub fn run_general() {
 }
 
 // Menu when user specifies a file
-pub fn run_file() {
+pub fn run_file(action: &FileAction, path: &PathBuf) -> anyhow:Result<()> {
     println!();
     match action {
         FileAction::Rename => action_rename(path),
@@ -54,7 +54,7 @@ pub fn run_file() {
     }
 }
 
-fn action_new_file() {
+fn action_new_file() -> anyhow::Result<()> {
     let name: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("New file name")
         .interact_text()?;
@@ -70,7 +70,7 @@ fn action_new_file() {
     Ok(())
 }
 
-fn action_new_dir() {
+fn action_new_dir() -> anyhow::Result<()> {
     let name: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("New folder name")
         .interact_text()?;
@@ -80,7 +80,7 @@ fn action_new_dir() {
     Ok(())
 }
 
-fn action_open_picker() {
+fn action_open_picker() -> anyhow::Result<()> {
     let name: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Path to open")
         .interact_text()?;
@@ -89,7 +89,7 @@ fn action_open_picker() {
     action_open(&path)
 }
 
-fn action_search() {
+fn action_search() -> anyhow::Result<()> {
     let options = vec!["Search for a file (by name)", "Search for text (inside files)"];
     let choice = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("What are you looking for?")
@@ -126,7 +126,7 @@ fn action_search() {
     Ok(())
 }
 
-fn action_copy_path() {
+fn action_copy_path() -> anyhow::Result<()> {
     let cwd = env::current_dir()?;
     let path_str = cwd.to_string_lossy().into_owned();
 
@@ -140,7 +140,7 @@ fn action_copy_path() {
     Ok(())
 }
 
-fn action_history() {
+fn action_history() -> anyhow::Result<()> {
     println!("Shell history is managed by your shell (bash/zsh/fish).");
     println!("To jump to a recent directory, try:");
     println!("  cd -          (go back one directory)");
@@ -149,7 +149,7 @@ fn action_history() {
     Ok(())
 }
 
-fn action_rename() {
+fn action_rename(path: &PathBuf) -> anyhow::Result<()> {
     let old_name = path.file_name().unwrap_or_default().to_string_lossy();
 
     let new_name: String = Input::with_theme(&ColorfulTheme::default())
@@ -179,20 +179,77 @@ fn action_rename() {
     Ok(())
 }
 
-fn action_copy() {
-    todo!()
+fn action_copy(path: &PathBuf) -> anyhow::Result<()> {
+    let dest: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Copy to (path or directory")
+        .interact_text()?;
+
+    let status = if path.is_dir() {
+        Command::new("cp").args(["-r", &path.to_string_lossy(), &dest]).status()?
+    } else {
+        Command::new("cp").args([&path.to_string_lossy() as &str, &dest]).status()?
+    };
+
+    if status.success() {
+        println!("Copied to '{}'.", dest);
+    }
+    Ok(())
 }
 
-fn action_move() {
-    todo!()
+fn action_move(path: &PathBuf) -> anyhow::Result<()> {
+    let dest: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Move to (path or directory)")
+        .interact_text()?;
+
+    let status = Command::new("mv")
+        .args([&path.to_string_lossy() as &str, &dest])
+        .status()?;
+
+    if status.success() {
+        println!("Moved to '{}'.", dest);
+    }
+    Ok(())
 }
 
-fn action_open() {
-    todo!()
+fn action_open(path: &PathBuf) -> anyhow::Result<()> {
+    if path.is_dir() {
+        // We can't cd the parent shell, so we peint the command and advise the user
+        let abs = path.canonicalize().unwrap_or_else(|_| path.clone());
+        println!("To open this directory, run:");
+        println!("  cd {}", shell_escape(&abs.to_string_lossy()));
+        println!();
+        println!("Tip: you can add rclick as a shell function that runs `cd` for you.");
+        return Ok(());
+    }
+
+    // Detect text files by extension and open in $EDITOR
+    if is_text_file(path) {
+        let editor = env::var("EDITOR").unwrap_or_else(|_| "nano".into());
+        Command::new(&editor).arg(path).status()?;
+        return Ok(());
+    }
+
+    // Fall back to xdg-open (Linux) or open (macOS)
+    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+    Command::new(opener).arg(path).status()?;
+    Ok(())
 }
 
-fn action_view() {
-    todo!()
+fn action_view(path: &PathBug) -> anyhow::Result<()> {
+    if path.is_dir() {
+        Command::new("Is").args(["-lah", &path.to_string_lossy() as &str]).status()?;
+        return Ok(());
+    }
+
+    // Try bat first, fall back to less
+    let pager = if Command::new("bat").arg("--version").output().is_ok() {
+        "bat"
+    } else {
+        "less"
+    };
+
+    Command::new(pager).arg(path).status()?;
+    Ok(())
 }
 
 fn action_permissions() {
