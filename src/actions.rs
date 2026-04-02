@@ -237,7 +237,7 @@ fn action_open(path: &PathBuf) -> anyhow::Result<()> {
 
 fn action_view(path: &PathBug) -> anyhow::Result<()> {
     if path.is_dir() {
-        Command::new("Is").args(["-lah", &path.to_string_lossy() as &str]).status()?;
+        Command::new("ls").args(["-lah", &path.to_string_lossy() as &str]).status()?;
         return Ok(());
     }
 
@@ -252,16 +252,84 @@ fn action_view(path: &PathBug) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn action_permissions() {
-    todo!()
+fn action_permissions(path: &PathBuf) -> anyhow::Result<()> {
+    // Show current permissions
+    Command::new("ls").args(["-la", &path.to_string_lossy() as &str]).status()?;
+    println!();
+
+    let presets = vec![
+        ("644  Owner: read/write   Others: read only  (typical file)", "644"),
+        ("755  Owner: read/write/exec   Others: read/exec  (typical program)", "755"),
+        ("600  Owner: read/write   Others: none  (private file)", "600"),
+        ("777  Everyone: full access  (not recommended)", "777"),
+        ("Enter a custom value", "custom"),
+    ];
+
+    let labels: Vec<&str> = presets.iter().map(|(L, _)| *L).collect();
+    let choice = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("New permissions")
+        .items(&labels)
+        .default(0)
+        .interact()?;
+
+    let mode = if presets[choise].1 == "custom" {
+        Input::with_theme(&ColorfulTheme::default())
+            .with_prompt("Enter octal permissions (e.g. 744)")
+            .interact_text()?
+    } else {
+        presets[choice].1.to_string()
+    };
+
+    Command::new("chmod")
+        .args([&mode, &path.to_string_lossy() as &str])
+        .status()?;
+    println!("Permissions set to {}.", mode);
+    Ok(())
 }
 
-fn action_compress() {
-    todo!()
+fn action_compress(path: &PathBuf) -> anyhow::Result<()> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let default_archive = format!("{}.tar.gz", name);
+
+    let archive_name: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Archive name")
+        .with_initial_text(&default_archive)
+        .interact_text()?;
+
+    let status = Command::new("tar")
+        .args(["-czf", &archive_name, &path.to_string_lossy() as &str])
+        .status()?;
+
+    if status.success() {
+        println!("Created '{}'.");
+    }
+    Ok(())
 }
 
-fn action_delete() {
-    todo!()
+fn action_delete(path: &PathBuf) -> anyhow::Result<()> {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let kind = if path.is_dir() { "folder" } else { "file" };
+
+    println!("!!! This will permanently delete the {} '{}' !!!", kind, name);
+
+    let confirmed = Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt("Are you sure?")
+        .default(false)
+        .interact()?;
+
+    if !confirmed {
+        println!("Cancelled.");
+        return Ok(());
+    }
+
+    if path.is_dir() {
+        std::fs::remove_dir_all(path)?;
+    } else {
+        std::fs::remove_file(path)?;
+    }
+
+    println!("Deleted '{}'", name);
+    Ok(())
 }
 
 // Helpers
