@@ -1,6 +1,6 @@
 # rclick
 
-A friendly TUI right-click menu for the terminal. Designed for people who are new to the command line — or just prefer not to memorise every command.
+A friendly TUI right-click menu for the terminal. Designed for people who are new to the command line, or just prefer not to memorise every command.
 
 ## Installation
 
