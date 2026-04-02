@@ -7,7 +7,7 @@ A friendly TUI right-click menu for the terminal. Designed for people who are ne
 ### Quick install (macOS and Linux)
 
 ```sh
-shcurl -fsSL https://raw.githubusercontent.com/BenHooke/rclick/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/BenHooke/rclick/main/install.sh | sh
 ```
 The installer detects your OS and architecture, downloads the right binary, and places it in /usr/local/bin. It will also print the optional shell function for cd support.
 
