@@ -87,7 +87,7 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
 
     let result = loop {
         terminal.draw(|frame| {
-            let area = frame.area();
+            let area = frame.size();
 
             // Display a pop-up in the center of terminal
             let popup_width = 40u16.min(area.width.saturating_sub(4));

@@ -27,7 +27,7 @@ pub enum FileAction {
 }
 
 // Menu when ran with no args
-pub fn run_general(action: &GeneralAction) -> anyhow:Result<()> {
+pub fn run_general(action: &GeneralAction) -> anyhow::Result<()> {
     println!();
     match action {
         GeneralAction::NewFile => action_new_file(),
@@ -40,7 +40,7 @@ pub fn run_general(action: &GeneralAction) -> anyhow:Result<()> {
 }
 
 // Menu when user specifies a file
-pub fn run_file(action: &FileAction, path: &PathBuf) -> anyhow:Result<()> {
+pub fn run_file(action: &FileAction, path: &PathBuf) -> anyhow::Result<()> {
     println!();
     match action {
         FileAction::Rename => action_rename(path),
@@ -104,7 +104,7 @@ fn action_search() -> anyhow::Result<()> {
                 .with_prompt("File name to search for (supports wildcards, e.g. *.txt)")
                 .interact_text()?;
             println!("\nSearching from current directory...\n");
-            Command::new("fing")
+            Command::new("find")
                 .args([".", "-name", &query])
                 .status()?;
         }
@@ -115,10 +115,10 @@ fn action_search() -> anyhow::Result<()> {
                 .interact_text()?;
             let dir: String = Input::with_theme(&ColorfulTheme::default())
                 .with_prompt("Search in (directory -default is current dir-)")
-                .default("."into())
+                .default(".".into())
                 .interact_text()?;
             Command::new("grep")
-                .args(["-r", "--color=auto", &query, &dir])
+                .args(["-rIn", "--color=auto", &query, &dir])
                 .status()?;
         }
         _ => {}
@@ -181,7 +181,7 @@ fn action_rename(path: &PathBuf) -> anyhow::Result<()> {
 
 fn action_copy(path: &PathBuf) -> anyhow::Result<()> {
     let dest: String = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Copy to (path or directory")
+        .with_prompt("Copy to (path or directory)")
         .interact_text()?;
 
     let status = if path.is_dir() {
@@ -215,10 +215,13 @@ fn action_open(path: &PathBuf) -> anyhow::Result<()> {
     if path.is_dir() {
         // We can't cd the parent shell, so we peint the command and advise the user
         let abs = path.canonicalize().unwrap_or_else(|_| path.clone());
-        println!("To open this directory, run:");
-        println!("  cd {}", shell_escape(&abs.to_string_lossy()));
-        println!();
-        println!("Tip: you can add rclick as a shell function that runs `cd` for you.");
+        // Write the cd target to a temp file the shell wrapper can read
+        if let Ok(tmp) = std::env::var("RCLICK_CD_FILE") {
+            std::fs::write(&tmp, abs.to_string_lossy().as_bytes())?;
+        } else {
+            println!("To open this directory, run:");
+            println!("  cd {}", shell_escape(&abs.to_string_lossy()));
+        }
         return Ok(());
     }
 
@@ -235,7 +238,7 @@ fn action_open(path: &PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn action_view(path: &PathBug) -> anyhow::Result<()> {
+fn action_view(path: &PathBuf) -> anyhow::Result<()> {
     if path.is_dir() {
         Command::new("ls").args(["-lah", &path.to_string_lossy() as &str]).status()?;
         return Ok(());
@@ -272,7 +275,7 @@ fn action_permissions(path: &PathBuf) -> anyhow::Result<()> {
         .default(0)
         .interact()?;
 
-    let mode = if presets[choise].1 == "custom" {
+    let mode = if presets[choice].1 == "custom" {
         Input::with_theme(&ColorfulTheme::default())
             .with_prompt("Enter octal permissions (e.g. 744)")
             .interact_text()?
@@ -301,7 +304,7 @@ fn action_compress(path: &PathBuf) -> anyhow::Result<()> {
         .status()?;
 
     if status.success() {
-        println!("Created '{}'.");
+        println!("Created '{}'.", archive_name);
     }
     Ok(())
 }
@@ -332,17 +335,71 @@ fn action_delete(path: &PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-// Helpers
+// Helper funtions
 
-fn is_text_file() {
-    todo!()
+fn is_text_file(path: &PathBuf) -> bool {
+    let text_extensions = [
+        "txt", "md", "rs", "py", "js", "ts", "jsx", "tsx", "html", "css",
+        "json", "toml", "yaml", "yml", "sh", "bash", "zsh", "fish", "env",
+        "gitignore", "dockerfile", "makefile", "c", "cpp", "h", "go", "rb",
+        "java", "kt", "swift", "xml", "csv", "log", "conf", "ini", "cfg",
+    ];
+
+    match path.extension() {
+        Some(ext) => text_extensions.contains(&ext.to_string_lossy().to_lowercase().as_str()),
+        None => {
+            // No extension - check the filename itself
+            let name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_lowercase();
+            matches!(name.as_str(), "makefile" | "dockerfile" | "readme" | "license")
+        }
+    }
 }
 
-fn try_copy_to_clipboard() {
-    todo!()
+fn try_copy_to_clipboard(text: &str) -> bool {
+    // macOS
+    if let Ok(mut child) = Command::new("pbcopy").stdin(std::process::Stdio::piped()).spawn() {
+        if let Some(stdin) = child.stdin.as_mut() {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        return child.wait().map(|s| s.success()).unwrap_or(false);
+    }
+    // Linux (xclip)
+    if let Ok(mut child) = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(stdin) = child.stdin.as_mut() {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        return child.wait().map(|s| s.success()).unwrap_or(false);
+    }
+    // Linux (xsel)
+    if let Ok(mut child) = Command::new("xsel")
+        .args(["--clipboard", "--input"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(stdin) = child.stdin.as_mut() {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        return child.wait().map(|s| s.success()).unwrap_or(false);
+    }
+    false
 }
 
-fn shell_escape() {
-    todo!()
+fn shell_escape(s: &str) -> String {
+    if s.contains(' ') || s.contains('\'') {
+        format!("'{}'", s.replace('\'', r"'\''"))
+    } else {
+        s.to_string()
+    }
 }
 
