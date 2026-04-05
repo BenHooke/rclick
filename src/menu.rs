@@ -74,9 +74,9 @@ pub fn run_browse_menu() -> anyhow::Result<()> {
         .map(|p| {
             let name = p.file_name().unwrap_or_default().to_string_lossy();
             if p.is_dir() {
-                format!("   {}", name)
+                format!("  📁 {}", name)
             } else {
-                format!("   {}", name)
+                format!("  📄 {}", name)
             }
         })
         .collect();
