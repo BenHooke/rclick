@@ -34,22 +34,21 @@ pub fn run_general_menu() -> anyhow::Result<()> {
     let title = " rclick ";
     let subtitle = " Current directory ";
 
-    match pick_item(&labels, title, subtitle)? {
-        Some(idx) => {
+    match pick_item(&labels, title, subtitle, false)? {
+        PickResult::Selected(idx) => {
             if matches!(items[idx].1, GeneralAction::Browse) {
-                run_browse_menu()
+                let cwd = std::env::current_dir()?;
+                run_browse_menu(&cwd)
             } else {
                 actions::run_general(&items[idx].1)
             }
         }
-        None => Ok(()),  // User pressed Esc or 'q'
+        PickResult::GoUp | PickResult::Cancelled => Ok(()),
     }
 }
 
-pub fn run_browse_menu() -> anyhow::Result<()> {
-    let cwd = std::env::current_dir()?;
-
-    let mut entries: Vec<PathBuf> = std::fs::read_dir(&cwd)?
+pub fn run_browse_menu(dir: &PathBuf) -> anyhow::Result<()> {
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .collect();
 
@@ -85,15 +84,30 @@ pub fn run_browse_menu() -> anyhow::Result<()> {
 
     let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
-    let dir_name = cwd.file_name()
+    let dir_name = dir
+        .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "/".to_string());
     let subtitle_text = format!(" {} ", dir_name);
     let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
 
-    match pick_item(&label_refs, " browse ", subtitle)? {
-        Some(idx) => run_file_menu(&entries[idx]),
-        None => Ok(()),
+    match pick_item(&label_refs, " browse ", subtitle, true)? {
+        PickResult::Selected(idx) => {
+            let selected = &entries[idx];
+            if selected.is_dir() {
+                run_browse_menu(selected)
+            } else {
+                run_file_menu(selected)
+            }
+        }
+        PickResult::GoUp => {
+            if let Some(parent) = dir.parent() {
+                run_browse_menu(&parent.to_path_buf())
+            } else {
+                Ok(())
+            }
+        }
+        PickResult::Cancelled => Ok(()),
     }
 }
 
@@ -126,13 +140,21 @@ pub fn run_file_menu(path: &PathBuf) -> anyhow::Result<()> {
     let subtitle_text = format!(" {} ", name);
     let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
 
-    match pick_item(&labels, title, subtitle)? {
-        Some(idx) => actions::run_file(&items[idx].1, path),
-        None => Ok(()),
+    match pick_item(&labels, title, subtitle, false)? {
+        PickResult::Selected(idx) => actions::run_file(&items[idx].1, path),
+        PickResult::GoUp | PickResult::Cancelled => Ok(())
     }
 }
 
-fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Option<usize>> {
+// Core TUI picker
+
+enum PickResult {
+    Selected(usize),
+    GoUp,
+    Cancelled,
+}
+
+fn pick_item(items: &[&str], title: &str, subtitle: &str, browse_mode: bool) -> anyhow::Result<PickResult> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
@@ -207,8 +229,14 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
             frame.render_stateful_widget(list, chunks[1], &mut state);
 
             // Hint line
+            let hint_text = if browse_mode {
+                " ↑↓/jk navigate   →/l open   ←/h back   esc cancel "
+            } else {
+                " ↑↓ navigate   enter select   esc cancel "
+            };
+            
             let hint = Paragraph::new(Line::from(vec![Span::styled(
-                    " ↑↓ navigate  enter select  esc cancel ",
+                    hint_text,
                     Style::default().fg(Color::DarkGray),
                 )]))
                 .alignment(Alignment::Center);
@@ -221,9 +249,15 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
             }
 
             match key.code {
-                KeyCode::Esc | KeyCode::Char('q') => break Ok(None),
-                KeyCode::Enter => {
-                    break Ok(state.selected());
+                KeyCode::Esc | KeyCode::Char('q') => break Ok(PickResult::Cancelled),
+                KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
+                    match state.selected() {
+                        Some(idx) => break Ok(PickResult::Selected(idx)),
+                        None => {}
+                    }
+                }
+                KeyCode::Left | KeyCode::Char('h') if browse_mode => {
+                    break Ok(PickResult::GoUp);
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
                     let i = state.selected().unwrap_or(0);
