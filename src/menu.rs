@@ -112,18 +112,13 @@ pub fn run_browse_menu(dir: &PathBuf) -> anyhow::Result<()> {
 }
 
 pub fn run_file_menu(path: &PathBuf) -> anyhow::Result<()> {
-    let is_dir = path.is_dir();
-
     let mut items: Vec<(&str, FileAction)> = vec![
+        ("  Open", FileAction::Open),
         ("  Rename", FileAction::Rename),
         ("  Copy", FileAction::Copy),
         ("  Move", FileAction::Move),
         ("  View", FileAction::View),
     ];
-
-    if is_dir {
-        items.insert(0, ("  Open", FileAction::Open));
-    }
 
     items.push(("  Permissions", FileAction::Permissions));
     items.push(("  Compress", FileAction::Compress));
