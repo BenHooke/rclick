@@ -150,7 +150,7 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
 
             // Hint line
             let hint = Paragraph::new(Line::from(vec![Span::styled(
-                    " ↑↓ navigate   enter select   esc cancel ",
+                    " ↑↓ navigate  enter select  esc cancel ",
                     Style::default().fg(Color::DarkGray),
                 )]))
                 .alignment(Alignment::Center);
