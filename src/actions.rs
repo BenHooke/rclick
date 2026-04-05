@@ -12,6 +12,7 @@ pub enum GeneralAction {
     Search,
     CopyPath,
     History,
+    Browse,
 }
 
 #[derive(Debug)]
@@ -36,6 +37,7 @@ pub fn run_general(action: &GeneralAction) -> anyhow::Result<()> {
         GeneralAction::Search => action_search(),
         GeneralAction::CopyPath => action_copy_path(),
         GeneralAction::History => action_history(),
+        GeneralAction::Browse => Ok(()),  // Handled directly in menu.rs
     }
 }
 

@@ -21,6 +21,7 @@ use crate::actions::{self, FileAction, GeneralAction};
 // General right click
 pub fn run_general_menu() -> anyhow::Result<()> {
     let items = vec![
+        ("  Browse files", GeneralAction::Browse),
         ("  New file", GeneralAction::NewFile),
         ("  New directory", GeneralAction::NewDir),
         ("  Open...", GeneralAction::Open),
@@ -34,8 +35,63 @@ pub fn run_general_menu() -> anyhow::Result<()> {
     let subtitle = " Current directory ";
 
     match pick_item(&labels, title, subtitle)? {
-        Some(idx) => actions::run_general(&items[idx].1),
+        Some(idx) => {
+            if matches!(items[idx].1, GeneralAction::Browse) {
+                run_browse_menu()
+            } else {
+                actions::run_general(&items[idx].1)
+            }
+        }
         None => Ok(()),  // User pressed Esc or 'q'
+    }
+}
+
+pub fn run_browse_menu() -> anyhow::Result<()> {
+    let cwd = std::env::current_dir()?;
+
+    let mut entries: Vec<PathBuf> = std::fs::read_dir(&cwd)?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+
+    entries.sort_by(|a, b| {
+        let a_dir = a.is_dir();
+        let b_dir = b.is_dir();
+        match (a_dir, b_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.file_name().cmp(&b.file_name()),
+        }
+    });
+
+    if entries.is_empty() {
+        println!("Directory is empty.");
+        return Ok(());
+    }
+
+    // Build display labels with a [dir] indicator
+    let labels: Vec<String> = entries
+        .iter()
+        .map(|p| {
+            let name = p.file_name().unwrap_or_default().to_string_lossy();
+            if p.is_dir() {
+                format!("   {}", name)
+            } else {
+                format!("   {}", name)
+            }
+        })
+        .collect();
+
+    let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
+
+    let dir_name = cwd.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/".to_string());
+    let subtitle_text = format!(" {} ", dir_name);
+    let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
+
+    match pick_item(&label_refs, " browse ", subtitle)? {
+        Some(idx) => run_file_menu(&entries[idx]),
+        None => Ok(()),
     }
 }
 
