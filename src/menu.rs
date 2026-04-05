@@ -1,5 +1,5 @@
 use std::io;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
@@ -73,10 +73,12 @@ pub fn run_browse_menu() -> anyhow::Result<()> {
         .iter()
         .map(|p| {
             let name = p.file_name().unwrap_or_default().to_string_lossy();
+
             if p.is_dir() {
                 format!("  📁 {}", name)
             } else {
-                format!("  📄 {}", name)
+                let icon = get_file_icon(p);
+                format!("  {} {}", icon, name)
             }
         })
         .collect();
@@ -146,7 +148,7 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
             let area = frame.size();
 
             // Display a pop-up in the center of terminal
-            let popup_width = 40u16.min(area.width.saturating_sub(4));
+            let popup_width = 80u16.min(area.width.saturating_sub(4));
             let popup_height = (items.len() as u16 + 6).min(area.height.saturating_sub(4));
             let x = (area.width.saturating_sub(popup_width)) / 2;
             let y = (area.height.saturating_sub(popup_height)) / 2;
@@ -244,3 +246,19 @@ fn pick_item(items: &[&str], title: &str, subtitle: &str) -> anyhow::Result<Opti
     result
 }
 
+// Helper functions
+
+fn get_file_icon(path: &Path) -> &str {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("rs") => "🦀",
+        Some("py") => "🐍",
+        Some("js") => "🟨",
+        Some("ts") => "🟦",
+        Some("json") | Some("toml") => "⚙️",
+        Some("md") => "📝",
+        Some("sh") | Some("exe") => "▶",
+        Some("png") | Some("jpg") | Some("jpeg") => "🖼️",
+        Some("zip") | Some("tar") | Some("gz") => "📦",
+        _ => "📄",
+    }
+}
