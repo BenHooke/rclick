@@ -62,8 +62,18 @@ pub fn run_browse_menu(dir: &PathBuf) -> anyhow::Result<()> {
         }
     });
 
+    let dir_name = dir
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/".to_string());
+
     if entries.is_empty() {
-        println!("Directory is empty.");
+        let subtitle_text = format!(" {} ", dir_name);
+        let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
+        pick_item(&["  (Empty Directory)"], " browse ", subtitle, true)?;
+        if let Some(parent) = dir.parent() {
+            return run_browse_menu(&parent.to_path_buf());
+        }
         return Ok(());
     }
 
@@ -84,10 +94,6 @@ pub fn run_browse_menu(dir: &PathBuf) -> anyhow::Result<()> {
 
     let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
-    let dir_name = dir
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_else(|| "/".to_string());
     let subtitle_text = format!(" {} ", dir_name);
     let subtitle: &str = Box::leak(subtitle_text.into_boxed_str());
 
