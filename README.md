@@ -81,5 +81,5 @@ rclick() {
 }
 ```
 
-A more complete shell integration that auto-cd's is on the roadmap. As well as a more visual fuzzy finder view for the cwd.
+A more complete shell integration that auto-cd's is on the roadmap.
 
